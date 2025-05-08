@@ -29,7 +29,7 @@ contract("LandRegistry", accounts => {
     describe("Land Price Management", () => {
         beforeEach(async () => {
             await landRegistry.registerLand(
-                "Location 1", 
+                "Location 1",
                 100,
                 "doc-hash-1",
                 "token-uri-1",
@@ -55,7 +55,7 @@ contract("LandRegistry", accounts => {
         beforeEach(async () => {
             await landRegistry.registerLand(
                 "Location 1",
-                100, 
+                100,
                 "doc-hash-1",
                 "token-uri-1",
                 { from: user1 }
@@ -71,7 +71,7 @@ contract("LandRegistry", accounts => {
 
         it("should buy land", async () => {
             await landRegistry.setForSale(1, true, { from: user1 });
-            await landRegistry.buyLand(1, { 
+            await landRegistry.buyLand(1, {
                 from: user2,
                 value: web3.utils.toWei("1", "ether")
             });
@@ -86,7 +86,7 @@ contract("LandRegistry", accounts => {
             await landRegistry.registerLand(
                 "Location 1",
                 100,
-                "doc-hash-1", 
+                "doc-hash-1",
                 "token-uri-1",
                 { from: user1 }
             );

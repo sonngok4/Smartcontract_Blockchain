@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Dashboard.css";
 
@@ -11,37 +11,43 @@ function Dashboard({ web3, contract, accounts }) {
     const fetchData = async () => {
       if (contract) {
         try {
-          // Lấy thông tin tổng số bất động sản đã đăng ký
-          const count = await contract.methods._tokenIds().call();
-          setLandCount(count);
+          // Bắt đầu với kích thước lô hợp lý
+          const batchSize = 10;
+          let validTokens = 0;
+          let startIndex = 1;
 
-          // Lấy thông tin 5 bất động sản gần đây nhất
-          const lands = [];
-          let startIndex = Math.max(1, count - 4);
-
-          for (let i = startIndex; i <= count; i++) {
+          while (true) {
             try {
-              // Kiểm tra nếu tokenId tồn tại
-              const exists = await contract.methods._exists(i).call();
+              // Thử lấy thông tin đất đai cho ID token hiện tại
+              await contract.methods.getLandDetails(startIndex).call();
+              validTokens++;
+              startIndex++;
+            } catch (error) {
+              // Nếu gặp lỗi, có thể đã đến cuối
+              break;
+            }
+          }
 
-              if (exists) {
-                const landDetails = await contract.methods
-                  .getLandDetails(i)
-                  .call();
-                lands.push({
-                  id: i,
-                  location: landDetails.location,
-                  area: landDetails.area,
-                  owner: landDetails.owner,
-                  price: web3.utils.fromWei(
-                    landDetails.price.toString(),
-                    "ether"
-                  ),
-                  forSale: landDetails.forSale,
-                });
-              }
+          setLandCount(validTokens);
+
+          // Lấy danh sách đất gần đây
+          const lands = [];
+          let recentStartIndex = Math.max(1, validTokens - 4);
+
+          for (let i = recentStartIndex; i <= validTokens; i++) {
+            try {
+              const landDetails = await contract.methods.getLandDetails(i).call();
+              lands.push({
+                id: i,
+                location: landDetails.location,
+                area: landDetails.area,
+                owner: landDetails.owner,
+                price: web3.utils.fromWei(landDetails.price.toString(), "ether"),
+                forSale: landDetails.forSale,
+              });
             } catch (err) {
               console.log(`Token ID ${i} might not exist`);
+              console.log(err);
             }
           }
 

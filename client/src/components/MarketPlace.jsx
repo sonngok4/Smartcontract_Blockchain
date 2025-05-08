@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './MarketPlace.css';
 
@@ -22,54 +22,55 @@ function MarketPlace({ web3, contract, accounts }) {
       }
 
       try {
-        // Lấy tổng số bất động sản đã đăng ký
-        const totalLands = await contract.methods._tokenIds().call();
-        
-        // Lấy thông tin tất cả bất động sản đang rao bán
+        // Tìm ID token hợp lệ cuối cùng bằng cách lặp qua các token
+        let lastValidTokenId = 0;
+        let currentId = 1;
         const landsForSale = [];
-        
-        for (let i = 1; i <= totalLands; i++) {
+
+        while (true) {
           try {
-            const exists = await contract.methods._exists(i).call();
-            
-            if (exists) {
-              const landDetails = await contract.methods.getLandDetails(i).call();
-              
-              // Chỉ lấy những bất động sản đang rao bán
-              if (landDetails.forSale) {
-                // Lấy metadata từ IPFS nếu có
-                let metadata = null;
-                try {
-                  const tokenURI = await contract.methods.tokenURI(i).call();
-                  if (tokenURI) {
-                    const ipfsHash = tokenURI.replace('ipfs://', '');
-                    const response = await fetch(`https://ipfs.io/ipfs/${ipfsHash}`);
-                    metadata = await response.json();
-                  }
-                } catch (err) {
-                  console.error(`Error fetching metadata for land ${i}:`, err);
+            // Thử lấy thông tin đất đai cho ID token hiện tại
+            const landDetails = await contract.methods.getLandDetails(currentId).call();
+            lastValidTokenId = currentId;
+
+            // Nếu đất đang được rao bán, thêm vào danh sách
+            if (landDetails.forSale) {
+              // Lấy metadata từ IPFS nếu có
+              let metadata = null;
+              try {
+                const tokenURI = await contract.methods.tokenURI(currentId).call();
+                if (tokenURI) {
+                  const ipfsHash = tokenURI.replace('ipfs://', '');
+                  const response = await fetch(`https://ipfs.io/ipfs/${ipfsHash}`);
+                  metadata = await response.json();
                 }
-                
-                landsForSale.push({
-                  id: i,
-                  location: landDetails.location,
-                  area: landDetails.area,
-                  owner: landDetails.owner,
-                  price: web3.utils.fromWei(landDetails.price.toString(), 'ether'),
-                  documentHash: landDetails.documentHash,
-                  metadata
-                });
+              } catch (err) {
+                console.error(`Lỗi khi lấy metadata cho đất ${currentId}:`, err);
               }
+
+              landsForSale.push({
+                id: currentId,
+                location: landDetails.location,
+                area: landDetails.area,
+                owner: landDetails.owner,
+                price: web3.utils.fromWei(landDetails.price.toString(), 'ether'),
+                documentHash: landDetails.documentHash,
+                metadata
+              });
             }
-          } catch (err) {
-            console.log(`Token ID ${i} might not exist or error: ${err.message}`);
+
+            currentId++;
+          } catch (error) {
+            // Nếu gặp lỗi, có thể đã đến cuối
+            console.error('Lỗi khi lấy thông tin đất:', error);
+            break;
           }
         }
-        
+
         setLands(landsForSale);
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching marketplace lands:', err);
+        console.error('Lỗi khi lấy danh sách đất rao bán:', err);
         setError(err.message);
         setLoading(false);
       }
@@ -94,7 +95,7 @@ function MarketPlace({ web3, contract, accounts }) {
     if (filters.maxPrice && parseFloat(land.price) > parseFloat(filters.maxPrice)) {
       return false;
     }
-    
+
     // Lọc theo diện tích
     if (filters.minArea && parseInt(land.area) < parseInt(filters.minArea)) {
       return false;
@@ -102,12 +103,12 @@ function MarketPlace({ web3, contract, accounts }) {
     if (filters.maxArea && parseInt(land.area) > parseInt(filters.maxArea)) {
       return false;
     }
-    
+
     // Lọc theo vị trí
     if (filters.location && !land.location.toLowerCase().includes(filters.location.toLowerCase())) {
       return false;
     }
-    
+
     return true;
   };
 
@@ -124,7 +125,7 @@ function MarketPlace({ web3, contract, accounts }) {
   return (
     <div className="marketplace">
       <h2>Thị trường bất động sản</h2>
-      
+
       <div className="filters">
         <h3>Bộ lọc</h3>
         <div className="filter-group">
@@ -140,7 +141,7 @@ function MarketPlace({ web3, contract, accounts }) {
               step="0.01"
             />
           </div>
-          
+
           <div className="filter-item">
             <label htmlFor="maxPrice">Giá cao nhất (ETH)</label>
             <input
@@ -153,7 +154,7 @@ function MarketPlace({ web3, contract, accounts }) {
               step="0.01"
             />
           </div>
-          
+
           <div className="filter-item">
             <label htmlFor="minArea">Diện tích nhỏ nhất (m²)</label>
             <input
@@ -165,7 +166,7 @@ function MarketPlace({ web3, contract, accounts }) {
               min="0"
             />
           </div>
-          
+
           <div className="filter-item">
             <label htmlFor="maxArea">Diện tích lớn nhất (m²)</label>
             <input
@@ -177,7 +178,7 @@ function MarketPlace({ web3, contract, accounts }) {
               min="0"
             />
           </div>
-          
+
           <div className="filter-item full-width">
             <label htmlFor="location">Vị trí</label>
             <input
@@ -191,7 +192,7 @@ function MarketPlace({ web3, contract, accounts }) {
           </div>
         </div>
       </div>
-      
+
       {filteredLands.length === 0 ? (
         <div className="no-lands">
           <p>Không có bất động sản nào đang rao bán phù hợp với bộ lọc</p>
@@ -202,15 +203,15 @@ function MarketPlace({ web3, contract, accounts }) {
             <div key={land.id} className="land-card">
               <div className="land-image">
                 {land.metadata && land.metadata.image ? (
-                  <img 
-                    src={land.metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')} 
-                    alt={`Land ${land.id}`} 
+                  <img
+                    src={land.metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')}
+                    alt={`Land ${land.id}`}
                   />
                 ) : (
                   <div className="image-placeholder">Không có hình ảnh</div>
                 )}
               </div>
-              
+
               <div className="land-info">
                 <h3>{land.metadata?.name || `Bất động sản #${land.id}`}</h3>
                 <p className="land-location">{land.location}</p>
@@ -218,10 +219,10 @@ function MarketPlace({ web3, contract, accounts }) {
                 <p className="land-price"><strong>Giá:</strong> {land.price} ETH</p>
                 <p className="land-owner"><strong>Chủ sở hữu:</strong> {land.owner.substring(0, 6)}...{land.owner.substring(land.owner.length - 4)}</p>
               </div>
-              
+
               <div className="land-actions">
                 <Link to={`/land/${land.id}`} className="view-details-btn">Xem chi tiết</Link>
-                
+
                 {accounts && accounts[0] && accounts[0].toLowerCase() !== land.owner.toLowerCase() && (
                   <Link to={`/land/${land.id}`} className="buy-btn">Mua ngay</Link>
                 )}
