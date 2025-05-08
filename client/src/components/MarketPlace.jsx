@@ -22,49 +22,53 @@ function MarketPlace({ web3, contract, accounts }) {
       }
 
       try {
-        // Tìm ID token hợp lệ cuối cùng bằng cách lặp qua các token
-        let lastValidTokenId = 0;
-        let currentId = 1;
+        console.log('Contract address:', contract._address);
+        console.log('Contract methods:', Object.keys(contract.methods));
+
         const landsForSale = [];
+        let currentId = 1;
+        const MAX_ATTEMPTS = 100; // Giới hạn số lần thử để tránh vòng lặp vô hạn
 
-        while (true) {
+        while (currentId <= MAX_ATTEMPTS) {
           try {
-            // Thử lấy thông tin đất đai cho ID token hiện tại
-            const landDetails = await contract.methods.getLandDetails(currentId).call();
-            lastValidTokenId = currentId;
+            console.log('Fetching land details for token ID:', currentId);
+            const exists = await contract.methods.ownerOf(currentId).call();
 
-            // Nếu đất đang được rao bán, thêm vào danh sách
-            if (landDetails.forSale) {
-              // Lấy metadata từ IPFS nếu có
-              let metadata = null;
-              try {
-                const tokenURI = await contract.methods.tokenURI(currentId).call();
-                if (tokenURI) {
-                  const ipfsHash = tokenURI.replace('ipfs://', '');
-                  const response = await fetch(`https://ipfs.io/ipfs/${ipfsHash}`);
-                  metadata = await response.json();
+            if (exists) {
+              const landDetails = await contract.methods.getLandDetails(currentId).call();
+              console.log('Land details received:', landDetails);
+
+              // Nếu đất đang được rao bán, thêm vào danh sách
+              if (landDetails.forSale) {
+                // Lấy metadata từ IPFS nếu có
+                let metadata = null;
+                try {
+                  const tokenURI = await contract.methods.tokenURI(currentId).call();
+                  if (tokenURI) {
+                    const ipfsHash = tokenURI.replace('ipfs://', '');
+                    const response = await fetch(`https://ipfs.io/ipfs/${ipfsHash}`);
+                    metadata = await response.json();
+                  }
+                } catch (err) {
+                  console.error(`Lỗi khi lấy metadata cho đất ${currentId}:`, err);
                 }
-              } catch (err) {
-                console.error(`Lỗi khi lấy metadata cho đất ${currentId}:`, err);
+
+                landsForSale.push({
+                  id: landDetails.id,
+                  location: landDetails.location,
+                  area: landDetails.area,
+                  owner: landDetails.owner,
+                  price: web3.utils.fromWei(landDetails.price.toString(), 'ether'),
+                  documentHash: landDetails.documentHash,
+                  metadata
+                });
               }
-
-              landsForSale.push({
-                id: currentId,
-                location: landDetails.location,
-                area: landDetails.area,
-                owner: landDetails.owner,
-                price: web3.utils.fromWei(landDetails.price.toString(), 'ether'),
-                documentHash: landDetails.documentHash,
-                metadata
-              });
             }
-
-            currentId++;
           } catch (error) {
-            // Nếu gặp lỗi, có thể đã đến cuối
-            console.error('Lỗi khi lấy thông tin đất:', error);
-            break;
+            // Nếu token không tồn tại (ownerOf throws error), bỏ qua và tiếp tục
+            console.log(`Token ${currentId} không tồn tại hoặc có lỗi:`, error.message);
           }
+          currentId++;
         }
 
         setLands(landsForSale);

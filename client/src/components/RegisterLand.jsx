@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { uploadFileToIPFS, uploadMetadataToIPFS } from '../utils/ipfsService.js';
 import './RegisterLand.css';
 
-function RegisterLand({ web3, contract, accounts }) {
+function RegisterLand({ contract, accounts }) {
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState({
     location: '',
     area: '',
@@ -82,29 +82,54 @@ function RegisterLand({ web3, contract, accounts }) {
       const metadataHash = await uploadMetadataToIPFS(metadata);
       const tokenURI = `ipfs://${metadataHash}`;
 
-      // Đăng ký bất động sản trên blockchain
-      const result = await contract.methods
+      // Convert area to number
+      const area = Number(formData.area);
+
+      // Estimate gas for the transaction
+      const gasEstimate = await contract.methods
         .registerLand(
           formData.location,
-          formData.area,
+          area,
           docHash,
           tokenURI
         )
-        .send({ from: accounts[0] });
+        .estimateGas({ from: accounts[0] });
+
+      // Convert gas estimate to number and add 20% buffer
+      const gasLimit = Math.floor(Number(gasEstimate) * 1.2);
+
+      // Đăng ký bất động sản trên blockchain với gas limit đã tính
+      const result = await contract.methods
+        .registerLand(
+          formData.location,
+          area,
+          docHash,
+          tokenURI
+        )
+        .send({
+          from: accounts[0],
+          gas: gasLimit
+        });
 
       // Lấy ID của bất động sản vừa đăng ký
       const landId = result.events.LandRegistered.returnValues.tokenId;
 
       setSuccess(`Đăng ký bất động sản thành công với ID: ${landId}`);
-      
+
       // Chuyển hướng đến trang chi tiết bất động sản sau khi đăng ký thành công
       setTimeout(() => {
         navigate(`/land/${landId}`);
       }, 2000);
-      
+
     } catch (err) {
       console.error('Error registering land:', err);
-      setError(err.message || 'Đã xảy ra lỗi khi đăng ký bất động sản');
+      if (err.message.includes('out of gas')) {
+        setError('Giao dịch không thành công do không đủ gas. Vui lòng thử lại với gas limit cao hơn.');
+      } else if (err.message.includes('BigInt')) {
+        setError('Lỗi chuyển đổi kiểu dữ liệu. Vui lòng kiểm tra lại thông tin nhập vào.');
+      } else {
+        setError(err.message || 'Đã xảy ra lỗi khi đăng ký bất động sản');
+      }
     } finally {
       setLoading(false);
     }
@@ -113,10 +138,10 @@ function RegisterLand({ web3, contract, accounts }) {
   return (
     <div className="register-land">
       <h2>Đăng ký bất động sản mới</h2>
-      
+
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
-      
+
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="location">Vị trí (địa chỉ đầy đủ)</label>
@@ -129,19 +154,21 @@ function RegisterLand({ web3, contract, accounts }) {
             required
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="area">Diện tích (m²)</label>
           <input
             type="number"
             id="area"
+            min={10}
+            step={0.01}
             name="area"
             value={formData.area}
             onChange={handleChange}
             required
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="documentTitle">Tiêu đề giấy tờ</label>
           <input
@@ -153,7 +180,7 @@ function RegisterLand({ web3, contract, accounts }) {
             required
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="description">Mô tả</label>
           <textarea
@@ -164,7 +191,7 @@ function RegisterLand({ web3, contract, accounts }) {
             rows="4"
           ></textarea>
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="landImage">Hình ảnh bất động sản</label>
           <input
@@ -175,7 +202,7 @@ function RegisterLand({ web3, contract, accounts }) {
             required
           />
         </div>
-        
+
         <div className="form-group">
           <label htmlFor="landDoc">Tài liệu pháp lý (PDF)</label>
           <input
@@ -186,7 +213,7 @@ function RegisterLand({ web3, contract, accounts }) {
             required
           />
         </div>
-        
+
         <button type="submit" className="submit-btn" disabled={loading}>
           {loading ? 'Đang xử lý...' : 'Đăng ký bất động sản'}
         </button>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Dashboard.css";
+import toast from "react-hot-toast";
 
 function Dashboard({ web3, contract, accounts }) {
   const [landCount, setLandCount] = useState(0);
@@ -55,6 +56,7 @@ function Dashboard({ web3, contract, accounts }) {
           setLoading(false);
         } catch (error) {
           console.error("Error fetching dashboard data:", error);
+          toast.error("Có lỗi khi tải dữ liệu");
           setLoading(false);
         }
       }
