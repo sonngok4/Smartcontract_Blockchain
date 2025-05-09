@@ -1,4 +1,5 @@
 #client/.env
+
 VITE_NODE_ENV=development
 
 VITE_PINATA_API_KEY=701c68063ac39e333efd
