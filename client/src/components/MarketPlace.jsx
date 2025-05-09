@@ -6,6 +6,8 @@ function MarketPlace({ web3, contract, accounts }) {
   const [lands, setLands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [filters, setFilters] = useState({
     minPrice: '',
     maxPrice: '',
@@ -13,6 +15,8 @@ function MarketPlace({ web3, contract, accounts }) {
     maxArea: '',
     location: ''
   });
+
+  const TOKENS_PER_PAGE = 10; // Số token mỗi trang
 
   useEffect(() => {
     const fetchMarketplaceLands = async () => {
@@ -22,25 +26,23 @@ function MarketPlace({ web3, contract, accounts }) {
       }
 
       try {
-        console.log('Contract address:', contract._address);
-        console.log('Contract methods:', Object.keys(contract.methods));
+        setLoading(true);
+        const startId = (currentPage - 1) * TOKENS_PER_PAGE + 1;
+        const endId = startId + TOKENS_PER_PAGE - 1;
 
         const landsForSale = [];
-        let currentId = 1;
-        const MAX_ATTEMPTS = 100; // Giới hạn số lần thử để tránh vòng lặp vô hạn
+        const processedIds = new Set();
 
-        while (currentId <= MAX_ATTEMPTS) {
+        for (let currentId = startId; currentId <= endId; currentId++) {
           try {
-            console.log('Fetching land details for token ID:', currentId);
-            const exists = await contract.methods.ownerOf(currentId).call();
+            // Kiểm tra token tồn tại bằng ownerOf
+            const owner = await contract.methods.ownerOf(currentId).call();
 
-            if (exists) {
+            if (owner && owner !== '0x0000000000000000000000000000000000000000' && !processedIds.has(currentId)) {
               const landDetails = await contract.methods.getLandDetails(currentId).call();
-              console.log('Land details received:', landDetails);
 
-              // Nếu đất đang được rao bán, thêm vào danh sách
               if (landDetails.forSale) {
-                // Lấy metadata từ IPFS nếu có
+                processedIds.add(currentId);
                 let metadata = null;
                 try {
                   const tokenURI = await contract.methods.tokenURI(currentId).call();
@@ -54,7 +56,7 @@ function MarketPlace({ web3, contract, accounts }) {
                 }
 
                 landsForSale.push({
-                  id: landDetails.id,
+                  id: currentId,
                   location: landDetails.location,
                   area: landDetails.area,
                   owner: landDetails.owner,
@@ -64,14 +66,28 @@ function MarketPlace({ web3, contract, accounts }) {
                 });
               }
             }
-          } catch (error) {
-            // Nếu token không tồn tại (ownerOf throws error), bỏ qua và tiếp tục
-            console.log(`Token ${currentId} không tồn tại hoặc có lỗi:`, error.message);
+          } catch (err) {
+            // Bỏ qua lỗi cho token không tồn tại
+            console.log(`Token ${currentId} không tồn tại hoặc có lỗi:`, err.message);
+            continue;
           }
-          currentId++;
         }
 
-        setLands(landsForSale);
+        // Kiểm tra xem còn token nào không
+        try {
+          const nextOwner = await contract.methods.ownerOf(endId + 1).call();
+          setHasMore(nextOwner && nextOwner !== '0x0000000000000000000000000000000000000000');
+        } catch {
+          setHasMore(false);
+        }
+
+        // Cập nhật danh sách lands, tránh trùng lặp
+        setLands(prevLands => {
+          const existingIds = new Set(prevLands.map(land => land.id));
+          const newLands = landsForSale.filter(land => !existingIds.has(land.id));
+          return [...prevLands, ...newLands];
+        });
+
         setLoading(false);
       } catch (err) {
         console.error('Lỗi khi lấy danh sách đất rao bán:', err);
@@ -81,7 +97,11 @@ function MarketPlace({ web3, contract, accounts }) {
     };
 
     fetchMarketplaceLands();
-  }, [contract, web3]);
+  }, [contract, web3, currentPage]);
+
+  const loadMore = () => {
+    setCurrentPage(prev => prev + 1);
+  };
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -92,33 +112,27 @@ function MarketPlace({ web3, contract, accounts }) {
   };
 
   const applyFilters = (land) => {
-    // Lọc theo giá
     if (filters.minPrice && parseFloat(land.price) < parseFloat(filters.minPrice)) {
       return false;
     }
     if (filters.maxPrice && parseFloat(land.price) > parseFloat(filters.maxPrice)) {
       return false;
     }
-
-    // Lọc theo diện tích
     if (filters.minArea && parseInt(land.area) < parseInt(filters.minArea)) {
       return false;
     }
     if (filters.maxArea && parseInt(land.area) > parseInt(filters.maxArea)) {
       return false;
     }
-
-    // Lọc theo vị trí
     if (filters.location && !land.location.toLowerCase().includes(filters.location.toLowerCase())) {
       return false;
     }
-
     return true;
   };
 
   const filteredLands = lands.filter(applyFilters);
 
-  if (loading) {
+  if (loading && currentPage === 1) {
     return <div className="loading">Đang tải thị trường bất động sản...</div>;
   }
 
@@ -202,38 +216,57 @@ function MarketPlace({ web3, contract, accounts }) {
           <p>Không có bất động sản nào đang rao bán phù hợp với bộ lọc</p>
         </div>
       ) : (
-        <div className="lands-grid">
-          {filteredLands.map((land) => (
-            <div key={land.id} className="land-card">
-              <div className="land-image">
-                {land.metadata && land.metadata.image ? (
-                  <img
-                    src={land.metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')}
-                    alt={`Land ${land.id}`}
-                  />
-                ) : (
-                  <div className="image-placeholder">Không có hình ảnh</div>
-                )}
-              </div>
+        <>
+          <div className="lands-grid">
+            {filteredLands.map((land) => (
+              <div key={land.id} className="land-card">
+                <div className="land-image">
+                  {land.metadata && land.metadata.image ? (
+                    <img
+                      src={land.metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')}
+                      alt={`Land ${land.id}`}
+                    />
+                  ) : (
+                    <div className="image-placeholder">Không có hình ảnh</div>
+                  )}
+                </div>
 
-              <div className="land-info">
-                <h3>{land.metadata?.name || `Bất động sản #${land.id}`}</h3>
-                <p className="land-location">{land.location}</p>
-                <p className="land-area"><strong>Diện tích:</strong> {land.area} m²</p>
-                <p className="land-price"><strong>Giá:</strong> {land.price} ETH</p>
-                <p className="land-owner"><strong>Chủ sở hữu:</strong> {land.owner.substring(0, 6)}...{land.owner.substring(land.owner.length - 4)}</p>
-              </div>
+                <div className="land-info">
+                  <h3>{land.metadata?.name || `Bất động sản #${land.id}`}</h3>
+                  <p className="land-location">{land.location}</p>
+                  <p className="land-area"><strong>Diện tích:</strong> {land.area} m²</p>
+                  <p className="land-price"><strong>Giá:</strong> {land.price} ETH</p>
+                  <p className="land-owner">
+                    <strong>Chủ sở hữu:</strong> {land.owner.substring(0, 6)}...{land.owner.substring(land.owner.length - 4)}
+                  </p>
+                </div>
 
-              <div className="land-actions">
-                <Link to={`/land/${land.id}`} className="view-details-btn">Xem chi tiết</Link>
-
-                {accounts && accounts[0] && accounts[0].toLowerCase() !== land.owner.toLowerCase() && (
-                  <Link to={`/land/${land.id}`} className="buy-btn">Mua ngay</Link>
-                )}
+                <div className="land-actions">
+                  <Link to={`/land/${land.id}`} className="view-details-btn">Xem chi tiết</Link>
+                  {accounts && accounts[0] && accounts[0].toLowerCase() !== land.owner.toLowerCase() && (
+                    <Link to={`/land/${land.id}`} className="buy-btn">Mua ngay</Link>
+                  )}
+                </div>
               </div>
+            ))}
+          </div>
+
+          {hasMore && !loading && (
+            <div className="load-more-container">
+              <button
+                className="load-more-btn"
+                onClick={loadMore}
+                disabled={loading}
+              >
+                {loading ? 'Đang tải...' : 'Tải thêm'}
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+
+          {loading && currentPage > 1 && (
+            <div className="loading">Đang tải thêm bất động sản...</div>
+          )}
+        </>
       )}
     </div>
   );

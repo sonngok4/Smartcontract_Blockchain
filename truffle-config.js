@@ -66,6 +66,30 @@ module.exports = {
 			gas: 6721975,
 			gasPrice: 20000000000,
 		},
+		sepolia: {
+			provider: () => {
+				if (!MNEMONIC || !INFURA_PROJECT_ID) {
+					throw new Error(
+						'Please set MNEMONIC and INFURA_PROJECT_ID in your .env file',
+					);
+				}
+				return new HDWalletProvider({
+					mnemonic: MNEMONIC,
+					providerOrUrl: `https://sepolia.infura.io/v3/${INFURA_PROJECT_ID}`,
+					addressIndex: 0,
+					numberOfAddresses: 1,
+					shareNonce: true,
+					derivationPath: "m/44'/60'/0'/0/",
+				});
+			},
+			network_id: 11155111,
+			gas: 5500000,
+			gasPrice: 20000000000,
+			confirmations: 2,
+			timeoutBlocks: 200,
+			skipDryRun: true,
+			websocket: true,
+		},
 		//
 		// An additional network, but with some advanced options…
 		// advanced: {
@@ -85,7 +109,7 @@ module.exports = {
 		//       MNEMONIC,
 		//       `https://sepolia.infura.io/v3/${INFURA_PROJECT_ID}`,
 		//     ),
-		//   network_id: 11155111n, // Sepolia's network id
+		//   network_id: 11155111, // Sepolia's network id
 		//   confirmations: 2, // # of confirmations to wait between deployments
 		//   timeoutBlocks: 200, // # of blocks before a deployment times out
 		//   skipDryRun: true, // Skip dry run before migrations

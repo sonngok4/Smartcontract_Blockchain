@@ -31,6 +31,16 @@ function App() {
         setNetworkId(network);
         console.log('Connected to network:', network);
 
+        // Validate network
+        const chainId = await web3Instance.eth.getChainId();
+        
+        const isSepolia = chainId === 11155111n; // Sepolia chainId
+        const isDevelopment = chainId === 1337n; // Ganache chainId
+
+        if (!isSepolia && !isDevelopment) {
+          throw new Error('Please connect to Sepolia network or local development network');
+        }
+
         // Initialize contract
         const contractInstance = await initContract();
         if (!contractInstance || !contractInstance.methods) {
