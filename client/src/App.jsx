@@ -1,16 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import './App.css';
+import CreateDepositAgreement from './components/CreateDepositAgreement';
 import Dashboard from './components/Dashboard';
+import EscrowDetails from './components/EscrowDetails';
+import EscrowManagement from './components/EscrowManagement';
 import LandDetails from './components/LandDetails';
 import MarketPlace from './components/MarketPlace';
 import MyLands from './components/MyLands';
 import RegisterLand from './components/RegisterLand';
-import { getAccounts, initContract, initWeb3 } from './utils/web3';
+import { getAccounts, initContract, initEscrowContract, initWeb3 } from './utils/web3';
 
 function App() {
   const [web3, setWeb3] = useState(null);
   const [contract, setContract] = useState(null);
+  const [escrowContract, setEscrowContract] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,7 +37,7 @@ function App() {
 
         // Validate network
         const chainId = await web3Instance.eth.getChainId();
-        
+
         const isSepolia = chainId === 11155111n; // Sepolia chainId
         const isDevelopment = chainId === 1337n; // Ganache chainId
 
@@ -69,6 +73,14 @@ function App() {
             window.location.reload();
           });
         }
+
+        // Initialize escrow contract
+        const escrowContractInstance = await initEscrowContract();
+        if (!escrowContractInstance || !escrowContractInstance.methods) {
+          throw new Error(`Escrow contract not initialized. Please make sure you're connected to the correct network (Current network: ${network})`);
+        }
+        console.log('Escrow contract address:', escrowContractInstance._address);
+        setEscrowContract(escrowContractInstance);
 
         setLoading(false);
       } catch (err) {
@@ -117,12 +129,13 @@ function App() {
       <div className="App">
         <header className="App-header">
           <h1>Hệ thống quản lý quyền sở hữu đất đai trên Blockchain</h1>
-          <nav>
+          <nav className="App-nav">
             <ul>
               <li><Link to="/">Trang chủ</Link></li>
               <li><Link to="/register">Đăng ký đất đai</Link></li>
               <li><Link to="/my-lands">Đất đai của tôi</Link></li>
               <li><Link to="/marketplace">Thị trường</Link></li>
+              <li><Link to="/escrows">Quản lý đặt cọc</Link></li>
             </ul>
           </nav>
           <div className="wallet-info">
@@ -138,6 +151,9 @@ function App() {
             <Route path="/land/:id" element={<LandDetails web3={web3} contract={contract} accounts={accounts} />} />
             <Route path="/my-lands" element={<MyLands web3={web3} contract={contract} accounts={accounts} />} />
             <Route path="/marketplace" element={<MarketPlace web3={web3} contract={contract} accounts={accounts} />} />
+            <Route path="/escrows" element={<EscrowManagement web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
+            <Route path="/create-deposit/:id" element={<CreateDepositAgreement web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
+            <Route path="/escrow/:id" element={<EscrowDetails web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
           </Routes>
         </main>
 

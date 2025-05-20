@@ -109,16 +109,16 @@
 .land-actions {
   padding: 1rem 1.5rem;
   border-top: 1px solid #eee;
-  display: flex;
-  gap: 1rem;
 }
 
 .view-details-btn,
+.deposit-btn,
 .buy-btn {
   padding: 0.8rem 1.2rem;
   border-radius: 4px;
   text-decoration: none;
   font-weight: 500;
+  display: inline-block;
   flex: 1;
   text-align: center;
 }
@@ -133,7 +133,17 @@
   color: white;
 }
 
+.deposit-btn {
+  background-color: #3f51b5;
+  color: white;
+  margin-bottom: 10px;
+}
+
 .buy-btn:hover {
+  background-color: #1a237e;
+}
+
+.deposit-btn:hover {
   background-color: #1a237e;
 }
 

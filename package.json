@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "concurrently": "^7.6.0",
-    "ganache": "^7.9.2"
+    "ganache": "^7.9.2",
+    "truffle": "^5.11.5"
   }
 }

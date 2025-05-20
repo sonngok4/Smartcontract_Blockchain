@@ -1,3 +1,7 @@
+input {
+  color: #000;
+  background-color: white;
+}
 .land-details {
   padding: 2rem;
 }

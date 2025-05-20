@@ -76,6 +76,7 @@ body {
 .App-header nav ul {
   display: flex;
   list-style: none;
+  justify-content: center;
 }
 
 .App-header nav ul li {

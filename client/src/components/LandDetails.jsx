@@ -1,34 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import './LandDetails.css';
 import toast from 'react-hot-toast';
+import { useNavigate, useParams } from 'react-router-dom';
+import './LandDetails.css';
 
 function LandDetails({ web3, contract, accounts }) {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [land, setLand] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [newPrice, setNewPrice] = useState('');
-  const [forSale, setForSale] = useState(false);
   const [metadata, setMetadata] = useState(null);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositPercentage, setDepositPercentage] = useState(10); // Mặc định 10% giá trị bất động sản
 
   useEffect(() => {
     const fetchLandDetails = async () => {
       try {
-        // Lấy thông tin chi tiết của bất động sản
         const landDetails = await contract.methods.getLandDetails(id).call();
         setLand(landDetails);
-
-        // Kiểm tra xem người dùng hiện tại có phải là chủ sở hữu
         setIsOwner(accounts[0] && accounts[0].toLowerCase() === landDetails.owner.toLowerCase());
-
-        // Lấy lịch sử giao dịch
         const history = await contract.methods.getTransactionHistory(id).call();
         setTransactions(history);
 
-        // Lấy metadata từ IPFS
         try {
           const tokenURI = await contract.methods.tokenURI(id).call();
           if (tokenURI) {
@@ -37,8 +33,12 @@ function LandDetails({ web3, contract, accounts }) {
             const data = await response.json();
             setMetadata(data);
           }
+          toast.dismiss();
+          toast.success('Tải thông tin bất động sản thành công!');
         } catch (err) {
           console.error('Error fetching metadata:', err);
+          toast.error('Có lỗi khi tải thông tin bất động sản: ' + err.message);
+          setMetadata(null);
         }
 
         setLoading(false);
@@ -53,66 +53,71 @@ function LandDetails({ web3, contract, accounts }) {
       fetchLandDetails();
     }
   }, [contract, id, accounts]);
+
   const handleUpdatePrice = async (e) => {
     e.preventDefault();
-
     try {
+      toast.loading('Đang cập nhật giá rao bán...');
       const priceInWei = web3.utils.toWei(newPrice, 'ether');
       await contract.methods.updateLandPrice(id, priceInWei).send({ from: accounts[0] });
-
-      // Cập nhật lại thông tin bất động sản
       const updatedLand = await contract.methods.getLandDetails(id).call();
       setLand(updatedLand);
       setNewPrice('');
-      toast.success('Cập nhật giá thành công!');
+      toast.dismiss();
+      toast.success('Cập nhật giá rao bán thành công!');
     } catch (err) {
       console.error('Error updating price:', err);
-      toast.error('Có lỗi khi cập nhật giá: ' + err.message);
+      toast.error('Có lỗi khi cập nhật giá rao bán: ' + err.message);
     }
   };
 
   const handleSetForSale = async () => {
     try {
+      toast.loading('Đang cập nhật trạng thái...');
       await contract.methods.setForSale(id, !land.forSale).send({ from: accounts[0] });
-
-      // Cập nhật lại thông tin bất động sản
       const updatedLand = await contract.methods.getLandDetails(id).call();
       setLand(updatedLand);
-      setForSale(updatedLand.forSale);
-      toast.success(updatedLand.forSale ? 'Bất động sản đã được đưa lên thị trường' : 'Bất động sản đã được gỡ khỏi thị trường');
+      toast.dismiss();
+      toast.success(updatedLand.forSale ? 'Bất động sản đã được mở cho đặt cọc' : 'Bất động sản đã được đóng đặt cọc');
     } catch (err) {
-      console.error('Error updating for sale status:', err);
+      console.error('Error updating sale status:', err);
       toast.error('Có lỗi khi cập nhật trạng thái: ' + err.message);
     }
   };
 
-  const handleBuyLand = async () => {
+  const handleCreateDeposit = async () => {
     try {
       if (!land.forSale) {
-        toast.error('Bất động sản này không được rao bán');
+        toast.error('Bất động sản này không được mở cho đặt cọc');
         return;
       }
 
-      await contract.methods.buyLand(id).send({
-        from: accounts[0],
-        value: land.price
+      if (!depositAmount || parseFloat(depositAmount) <= 0) {
+        toast.error('Vui lòng nhập số tiền đặt cọc hợp lệ');
+        return;
+      }
+
+      const listingPrice = web3.utils.fromWei(land.price, 'ether');
+      const suggestedDeposit = (parseFloat(listingPrice) * depositPercentage / 100).toFixed(4);
+
+      if (parseFloat(depositAmount) < parseFloat(suggestedDeposit)) {
+        toast.error(`Số tiền đặt cọc tối thiểu phải là ${suggestedDeposit} ETH (${depositPercentage}% giá trị bất động sản)`);
+        return;
+      }
+
+      // Chuyển hướng đến trang tạo hợp đồng đặt cọc
+      navigate(`/create-deposit/${id}`, {
+        state: {
+          landId: id,
+          depositAmount: depositAmount,
+          listingPrice: listingPrice,
+          landDetails: land,
+          metadata: metadata
+        }
       });
-
-      // Cập nhật lại thông tin bất động sản
-      const updatedLand = await contract.methods.getLandDetails(id).call();
-      setLand(updatedLand);
-
-      // Cập nhật lịch sử giao dịch
-      const history = await contract.methods.getTransactionHistory(id).call();
-      setTransactions(history);
-
-      // Cập nhật trạng thái chủ sở hữu
-      setIsOwner(accounts[0] && accounts[0].toLowerCase() === updatedLand.owner.toLowerCase());
-
-      toast.success('Mua bất động sản thành công!');
     } catch (err) {
-      console.error('Error buying land:', err);
-      toast.error('Có lỗi khi mua bất động sản: ' + err.message);
+      console.error('Error creating deposit:', err);
+      toast.error('Có lỗi khi tạo đặt cọc: ' + err.message);
     }
   };
 
@@ -127,6 +132,9 @@ function LandDetails({ web3, contract, accounts }) {
   if (!land) {
     return <div className="not-found">Không tìm thấy thông tin bất động sản với ID: {id}</div>;
   }
+
+  const listingPrice = web3.utils.fromWei(land.price, 'ether');
+  const suggestedDeposit = (parseFloat(listingPrice) * depositPercentage / 100).toFixed(4);
 
   return (
     <div className="land-details">
@@ -164,16 +172,16 @@ function LandDetails({ web3, contract, accounts }) {
           </div>
 
           <div className="info-item">
-            <span className="label">Giá:</span>
+            <span className="label">Giá rao bán:</span>
             <span className="value">
-              {land.price > 0 ? `${web3.utils.fromWei(land.price, 'ether')} ETH` : 'Chưa thiết lập'}
+              {land.price > 0 ? `${listingPrice} ETH` : 'Chưa thiết lập'}
             </span>
           </div>
 
           <div className="info-item">
             <span className="label">Trạng thái:</span>
             <span className={`value status ${land.forSale ? 'for-sale' : 'not-for-sale'}`}>
-              {land.forSale ? 'Đang rao bán' : 'Không rao bán'}
+              {land.forSale ? 'Đang mở đặt cọc' : 'Đã đóng đặt cọc'}
             </span>
           </div>
 
@@ -200,7 +208,7 @@ function LandDetails({ web3, contract, accounts }) {
 
               <form onSubmit={handleUpdatePrice} className="price-form">
                 <div className="form-group">
-                  <label htmlFor="newPrice">Cập nhật giá (ETH):</label>
+                  <label htmlFor="newPrice">Cập nhật giá rao bán (ETH):</label>
                   <input
                     type="number"
                     id="newPrice"
@@ -211,7 +219,7 @@ function LandDetails({ web3, contract, accounts }) {
                     required
                   />
                 </div>
-                <button type="submit" className="btn update-btn">Cập nhật giá</button>
+                <button type="submit" className="btn update-btn">Cập nhật giá rao bán</button>
               </form>
 
               <button
@@ -219,16 +227,33 @@ function LandDetails({ web3, contract, accounts }) {
                 className={`btn ${land.forSale ? 'remove-btn' : 'list-btn'}`}
                 disabled={land.price <= 0 && !land.forSale}
               >
-                {land.forSale ? 'Gỡ khỏi thị trường' : 'Đưa lên thị trường'}
+                {land.forSale ? 'Đóng đặt cọc' : 'Mở đặt cọc'}
               </button>
             </div>
           )}
 
           {!isOwner && land.forSale && (
-            <div className="buyer-actions">
-              <button onClick={handleBuyLand} className="btn buy-btn">
-                Mua bất động sản ({web3.utils.fromWei(land.price, 'ether')} ETH)
-              </button>
+            <div className="deposit-actions">
+              <div className="deposit-info">
+                <p className="suggested-deposit">
+                  <strong>Đề xuất số tiền đặt cọc:</strong> {suggestedDeposit} ETH ({depositPercentage}% giá trị bất động sản)
+                </p>
+              </div>
+              <div className="deposit-form">
+                <label htmlFor="depositAmount">Số tiền đặt cọc (ETH):</label>
+                <input
+                  type="number"
+                  id="depositAmount"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  min={suggestedDeposit}
+                  step="0.01"
+                  placeholder={`Tối thiểu ${suggestedDeposit} ETH`}
+                />
+                <button onClick={handleCreateDeposit} className="btn deposit-btn">
+                  Tạo hợp đồng đặt cọc
+                </button>
+              </div>
             </div>
           )}
         </div>
