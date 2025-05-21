@@ -62,8 +62,8 @@ function LandDetails({ web3, contract, accounts }) {
       await contract.methods.updateLandPrice(id, priceInWei).send({ from: accounts[0] });
       const updatedLand = await contract.methods.getLandDetails(id).call();
       setLand(updatedLand);
-      setNewPrice('');
       toast.dismiss();
+      setNewPrice('');
       toast.success('Cập nhật giá rao bán thành công!');
     } catch (err) {
       console.error('Error updating price:', err);

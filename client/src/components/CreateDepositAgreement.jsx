@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useNavigate, useParams } from 'react-router-dom';
+import EscrowAgreementService from '../services/EscrowAgreementService.js';
 import { uploadFileToIPFS } from '../utils/ipfsService.js';
 import './CreateDepositAgreement.css';
 
 function CreateDepositAgreement({ web3, contract, escrowContract, accounts }) {
     const { id } = useParams(); // ID của bất động sản
     const navigate = useNavigate();
+    const [escrowAgreementService, setEscrowAgreementService] = useState(null);
 
     const [land, setLand] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -14,7 +16,15 @@ function CreateDepositAgreement({ web3, contract, escrowContract, accounts }) {
     const [depositAmount, setDepositAmount] = useState('');
     const [depositDuration, setDepositDuration] = useState(30); // Mặc định 30 ngày
     const [contactInfo, setContactInfo] = useState('');
+    const [buyerInfo, setBuyerInfo] = useState({
+        fullName: '',
+        identityNumber: '',
+        address: '',
+        phoneNumber: '',
+        email: ''
+    });
     const [agreementPreview, setAgreementPreview] = useState(null);
+    const [agreementPDF, setAgreementPDF] = useState(null);
     const [error, setError] = useState(null);
     const [disputeReason, setDisputeReason] = useState('');
     const [showDisputeForm, setShowDisputeForm] = useState(false);
@@ -22,6 +32,13 @@ function CreateDepositAgreement({ web3, contract, escrowContract, accounts }) {
     const [showPartialRefundForm, setShowPartialRefundForm] = useState(false);
     const [escrowId, setEscrowId] = useState(null);
     const [escrow, setEscrow] = useState(null);
+
+    useEffect(() => {
+        if (web3 && contract) {
+            const service = new EscrowAgreementService(web3, contract);
+            setEscrowAgreementService(service);
+        }
+    }, [web3, contract]);
 
     useEffect(() => {
         const fetchLandDetails = async () => {
@@ -99,102 +116,115 @@ function CreateDepositAgreement({ web3, contract, escrowContract, accounts }) {
         fetchEscrowDetails();
     }, [escrowId, escrowContract]);
 
-    const generateAgreement = () => {
+    const handleDownloadPDF = async () => {
+        if (!escrowAgreementService || !land || !buyerInfo) {
+            toast.error('Thiếu thông tin cần thiết để tạo hợp đồng');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            toast.loading('Đang tạo file PDF...');
+
+            const escrowData = {
+                escrowId: escrowId || Date.now().toString(),
+                amount: web3.utils.toWei(depositAmount.toString(), 'ether'),
+                deadline: Math.floor(Date.now() / 1000) + (depositDuration * 24 * 60 * 60)
+            };
+
+            const buyerData = {
+                walletAddress: accounts[0],
+                ...buyerInfo
+            };
+
+            const sellerData = {
+                walletAddress: land.owner,
+                contactInfo: land.contactInfo || ''
+            };
+
+            const { content: pdfBlob } = await escrowAgreementService.generateAgreement(
+                escrowData,
+                land,
+                buyerData,
+                sellerData,
+                'pdf'
+            );
+
+            // Tạo URL cho blob và tải xuống
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = pdfUrl;
+            a.download = `hop-dong-dat-coc-${id}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(pdfUrl);
+
+            setAgreementPDF(pdfBlob);
+            toast.dismiss();
+            toast.success('Đã tạo file PDF thành công');
+        } catch (err) {
+            console.error('Error generating PDF:', err);
+            toast.error('Có lỗi khi tạo file PDF');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const generateAgreement = async () => {
+        if (!escrowAgreementService || !land || !buyerInfo.fullName || !buyerInfo.identityNumber) {
+            toast.error('Vui lòng điền đầy đủ thông tin cá nhân');
+            return;
+        }
+
         setGenerating(true);
         toast.loading('Đang tạo hợp đồng...');
 
-        // Lấy ngày hiện tại
-        const today = new Date();
-        const formattedDate = today.toLocaleDateString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
+        try {
+            const escrowData = {
+                escrowId: escrowId || Date.now().toString(),
+                amount: web3.utils.toWei(depositAmount.toString(), 'ether'),
+                deadline: Math.floor(Date.now() / 1000) + (depositDuration * 24 * 60 * 60)
+            };
 
-        // Format giá tiền
-        const depositAmountText = parseFloat(depositAmount).toLocaleString('vi-VN');
-        const landPriceText = parseFloat(web3.utils.fromWei(land.price, 'ether')).toLocaleString('vi-VN');
+            const buyerData = {
+                walletAddress: accounts[0],
+                ...buyerInfo
+            };
 
-        // Tính ngày hết hạn
-        const expiryDate = new Date(today);
-        expiryDate.setDate(today.getDate() + parseInt(depositDuration));
-        const formattedExpiryDate = expiryDate.toLocaleDateString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
+            const sellerData = {
+                walletAddress: land.owner,
+                contactInfo: land.contactInfo || ''
+            };
 
-        // Tạo nội dung hợp đồng đặt cọc
-        const agreementContent = `
-    <div class="deposit-agreement-preview">
-      <h1>HỢP ĐỒNG ĐẶT CỌC QUYỀN MUA BẤT ĐỘNG SẢN</h1>
-      
-      <p>Hôm nay, ngày ${formattedDate}, chúng tôi gồm:</p>
-      
-      <h2>BÊN BÁN (Bên A):</h2>
-      <p>Địa chỉ ví: ${land.owner}</p>
-      
-      <h2>BÊN MUA (Bên B):</h2>
-      <p>Địa chỉ ví: ${accounts[0]}</p>
-      <p>Thông tin liên hệ: ${contactInfo}</p>
-      
-      <h2>SAU KHI BÀN BẠC, THỎA THUẬN, HAI BÊN THỐNG NHẤT KÝ KẾT HỢP ĐỒNG ĐẶT CỌC VỚI CÁC ĐIỀU KHOẢN SAU:</h2>
-      
-      <h3>ĐIỀU 1: TÀI SẢN ĐẶT CỌC</h3>
-      <p>1.1. Bên B đồng ý đặt cọc cho Bên A để đảm bảo việc mua bất động sản với các thông tin như sau:</p>
-      <p>- Mã bất động sản: #${land.id}</p>
-      <p>- Vị trí: ${land.location}</p>
-      <p>- Diện tích: ${land.area} m²</p>
-      
-      <h3>ĐIỀU 2: SỐ TIỀN ĐẶT CỌC</h3>
-      <p>2.1. Số tiền đặt cọc: ${depositAmountText} ETH (bằng chữ: .....)</p>
-      <p>2.2. Số tiền đặt cọc này tương đương với ${Math.round(parseFloat(depositAmount) / parseFloat(web3.utils.fromWei(land.price, 'ether')) * 100)}% giá trị bất động sản.</p>
-      <p>2.3. Giá trị của bất động sản: ${landPriceText} ETH</p>
-      <p>2.4. Số tiền đặt cọc sẽ được chuyển qua smart contract và được quản lý bởi hệ thống blockchain.</p>
-      
-      <h3>ĐIỀU 3: THỜI HẠN VÀ PHƯƠNG THỨC GIAO DỊCH</h3>
-      <p>3.1. Thời hạn hiệu lực của hợp đồng đặt cọc: ${depositDuration} ngày kể từ ngày ký hợp đồng đặt cọc.</p>
-      <p>3.2. Hạn chót để hoàn tất giao dịch: ${formattedExpiryDate}</p>
-      <p>3.3. Trong thời hạn hiệu lực của hợp đồng đặt cọc, hai bên sẽ tiến hành các thủ tục pháp lý cần thiết để hoàn tất việc chuyển nhượng bất động sản theo quy định của pháp luật hiện hành.</p>
-      
-      <h3>ĐIỀU 4: QUYỀN VÀ NGHĨA VỤ CỦA BÊN A</h3>
-      <p>4.1. Có nghĩa vụ bảo quản, giữ gìn tài sản đặt cọc.</p>
-      <p>4.2. Không được phép bán, chuyển nhượng, thế chấp bất động sản nói trên cho bên thứ ba trong thời gian có hiệu lực của hợp đồng đặt cọc.</p>
-      <p>4.3. Cung cấp đầy đủ hồ sơ pháp lý liên quan đến bất động sản cho Bên B.</p>
-      <p>4.4. Nếu từ chối giao dịch trong thời hạn hiệu lực của hợp đồng đặt cọc mà không có lý do chính đáng, Bên A phải hoàn trả số tiền đặt cọc và bồi thường thêm một khoản tiền bằng số tiền đặt cọc cho Bên B.</p>
-      
-      <h3>ĐIỀU 5: QUYỀN VÀ NGHĨA VỤ CỦA BÊN B</h3>
-      <p>5.1. Được quyền yêu cầu Bên A cung cấp các thông tin, tài liệu liên quan đến bất động sản.</p>
-      <p>5.2. Nếu từ chối giao dịch trong thời hạn hiệu lực của hợp đồng đặt cọc mà không có lý do chính đáng, Bên B sẽ mất số tiền đặt cọc.</p>
-      
-      <h3>ĐIỀU 6: ĐIỀU KHOẢN CHUNG</h3>
-      <p>6.1. Hai bên cam kết thực hiện đúng và đầy đủ các điều khoản đã ghi trong hợp đồng.</p>
-      <p>6.2. Mọi sửa đổi, bổ sung hợp đồng phải được sự đồng ý của cả hai bên và được lập thành văn bản.</p>
-      <p>6.3. Hợp đồng này được thực hiện trên nền tảng blockchain với sự hỗ trợ của smart contract và được bảo đảm tính minh bạch, an toàn và chính xác.</p>
-      <p>6.4. Hợp đồng đặt cọc này được tạo thành 02 (hai) bản có giá trị pháp lý như nhau.</p>
-      
-      <div class="signature-section">
-        <div class="signature-block">
-          <h4>BÊN BÁN (BÊN A)</h4>
-          <p>(Ký và ghi rõ họ tên)</p>
-          <div class="signature-line"></div>
-          <p>${land.owner.substring(0, 10)}...${land.owner.substring(land.owner.length - 10)}</p>
-        </div>
-        
-        <div class="signature-block">
-          <h4>BÊN MUA (BÊN B)</h4>
-          <p>(Ký và ghi rõ họ tên)</p>
-          <div class="signature-line"></div>
-          <p>${accounts[0].substring(0, 10)}...${accounts[0].substring(accounts[0].length - 10)}</p>
-        </div>
-      </div>
-    </div>
-    `;
+            // Ensure land data has all required fields
+            const landDataForAgreement = {
+                id: land.id,
+                location: land.location,
+                area: land.area,
+                price: land.price,
+                owner: land.owner,
+                documentHash: land.documentHash,
+                metadata: land.metadata
+            };
 
-        setAgreementPreview(agreementContent);
-        setGenerating(false);
-        toast.dismiss();
-        toast.success('Hợp đồng đã được tạo thành công');
+            const { content: htmlContent } = await escrowAgreementService.generateAgreement(
+                escrowData,
+                landDataForAgreement,
+                buyerData,
+                sellerData,
+                'html'
+            );
+
+            setAgreementPreview(htmlContent);
+            toast.dismiss();
+            toast.success('Đã tạo hợp đồng thành công');
+        } catch (err) {
+            console.error('Error generating agreement:', err);
+            toast.error('Có lỗi khi tạo hợp đồng: ' + err.message);
+        } finally {
+            setGenerating(false);
+        }
     };
 
     const handleCreateEscrow = async () => {
@@ -329,6 +359,55 @@ function CreateDepositAgreement({ web3, contract, escrowContract, accounts }) {
                 </div>
             </div>
 
+            <div className="buyer-info-form">
+                <h3>Thông tin cá nhân người mua</h3>
+                <div className="form-group">
+                    <label>Họ và tên:</label>
+                    <input
+                        type="text"
+                        value={buyerInfo.fullName}
+                        onChange={(e) => setBuyerInfo({ ...buyerInfo, fullName: e.target.value })}
+                        required
+                    />
+                </div>
+                <div className="form-group">
+                    <label>Số CMND/CCCD:</label>
+                    <input
+                        type="text"
+                        value={buyerInfo.identityNumber}
+                        onChange={(e) => setBuyerInfo({ ...buyerInfo, identityNumber: e.target.value })}
+                        required
+                    />
+                </div>
+                <div className="form-group">
+                    <label>Địa chỉ thường trú:</label>
+                    <input
+                        type="text"
+                        value={buyerInfo.address}
+                        onChange={(e) => setBuyerInfo({ ...buyerInfo, address: e.target.value })}
+                        required
+                    />
+                </div>
+                <div className="form-group">
+                    <label>Số điện thoại:</label>
+                    <input
+                        type="tel"
+                        value={buyerInfo.phoneNumber}
+                        onChange={(e) => setBuyerInfo({ ...buyerInfo, phoneNumber: e.target.value })}
+                        required
+                    />
+                </div>
+                <div className="form-group">
+                    <label>Email:</label>
+                    <input
+                        type="email"
+                        value={buyerInfo.email}
+                        onChange={(e) => setBuyerInfo({ ...buyerInfo, email: e.target.value })}
+                        required
+                    />
+                </div>
+            </div>
+
             <div className="deposit-form">
                 <div className="form-group">
                     <label>Số tiền đặt cọc (ETH):</label>
@@ -381,6 +460,9 @@ function CreateDepositAgreement({ web3, contract, escrowContract, accounts }) {
 
                     <div className="actions">
                         <button className="back-btn" onClick={() => navigate(`/land/${id}`)}>Quay lại</button>
+                        <button className="download-btn" onClick={handleDownloadPDF}>
+                            Tải xuống PDF
+                        </button>
                         <button
                             className="submit-btn"
                             onClick={handleCreateEscrow}

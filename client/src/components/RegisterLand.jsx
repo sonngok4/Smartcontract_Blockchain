@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadFileToIPFS, uploadMetadataToIPFS } from '../utils/ipfsService.js';
 import './RegisterLand.css';
+import toast from 'react-hot-toast';
 
 function RegisterLand({ contract, accounts }) {
   const navigate = useNavigate();
@@ -114,6 +115,17 @@ function RegisterLand({ contract, accounts }) {
       // Lấy ID của bất động sản vừa đăng ký
       const landId = result.events.LandRegistered.returnValues.tokenId;
 
+      toast.success('Đăng ký bất động sản thành công!', {
+        duration: 2000,
+        style: {
+          background: '#4caf50',
+          color: '#fff',
+          fontSize: '16px',
+          padding: '10px',
+          borderRadius: '5px',
+          textAlign: 'center',
+        },
+      });
       setSuccess(`Đăng ký bất động sản thành công với ID: ${landId}`);
 
       // Chuyển hướng đến trang chi tiết bất động sản sau khi đăng ký thành công

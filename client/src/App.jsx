@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import EscrowDetails from './components/EscrowDetails';
 import EscrowManagement from './components/EscrowManagement';
 import LandDetails from './components/LandDetails';
+import LandEscrows from './components/LandEscrows';
 import MarketPlace from './components/MarketPlace';
 import MyLands from './components/MyLands';
 import RegisterLand from './components/RegisterLand';
@@ -154,6 +155,7 @@ function App() {
             <Route path="/escrows" element={<EscrowManagement web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
             <Route path="/create-deposit/:id" element={<CreateDepositAgreement web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
             <Route path="/escrow/:id" element={<EscrowDetails web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
+            <Route path="/land/:id/escrows" element={<LandEscrows web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
           </Routes>
         </main>
 
