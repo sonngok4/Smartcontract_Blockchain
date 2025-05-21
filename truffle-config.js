@@ -13,6 +13,11 @@ module.exports = {
 			gas: 6721975,
 			gasPrice: 20000000000,
 		},
+		ganache: {
+			host: "127.0.0.1",
+			port: 7545,
+			network_id: "*"
+		},
 		// Sepolia with Infura (kept as reference)
 		infura_sepolia: {
 			provider: () => {
@@ -65,6 +70,13 @@ module.exports = {
 			skipDryRun: true,
 			networkCheckTimeout: 120000,
 		},
+		coverage: {
+			host: 'localhost',
+			network_id: '*',
+			port: 8555,
+			gas: 0xfffffffffff,
+			gasPrice: 0x01
+		}
 	},
 
 	// Set default mocha options here, use special reporters, etc.
@@ -86,4 +98,5 @@ module.exports = {
 			},
 		},
 	},
+	plugins: ["solidity-coverage"],
 };

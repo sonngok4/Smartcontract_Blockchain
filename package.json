@@ -5,11 +5,29 @@
   "main": "truffle-config.js",
   "scripts": {
     "test": "truffle test",
+    "test:escrow": "truffle test test/EscrowContract.test.js",
+    "test:land": "truffle test test/LandRegistry.test.js",
+    "test:coverage": "npx solidity-coverage",
     "compile": "truffle compile",
+    "compile:all": "truffle compile --all",
     "migrate": "truffle migrate",
+    "migrate:reset": "truffle migrate --reset",
+    "migrate:sepolia": "truffle migrate --network sepolia",
+    "migrate:sepolia:reset": "truffle migrate --network sepolia --reset",
+    "migrate:ropsten": "truffle migrate --network ropsten",
+    "migrate:goerli": "truffle migrate --network goerli",
+    "migrate:ganache": "truffle migrate --network ganache",
+    "migrate:ganache:reset": "truffle migrate --network ganache --reset",
     "start-client": "cd client && npm run dev",
     "build-client": "cd client && npm run build",
-    "dev": "concurrently \"truffle develop\" \"npm run start-client\""
+    "dev": "concurrently \"truffle develop\" \"npm run start-client\"",
+    "ganache": "ganache --port 7545",
+    "dev:ganache": "concurrently \"npm run ganache\" \"npm run start-client\"",
+    "clean": "rm -rf build/",
+    "lint": "solhint 'contracts/**/*.sol'",
+    "prettier": "prettier --write 'contracts/**/*.sol'",
+    "generate-types": "truffle compile && typechain --target=truffle-v5 'build/contracts/*.json'",
+    "coverage": "truffle run coverage --network coverage"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.3",
@@ -21,7 +39,8 @@
   },
   "devDependencies": {
     "concurrently": "^7.6.0",
-    "ganache": "^7.9.2",
-    "truffle": "^5.11.5"
+    "prettier": "^3.5.3",
+    "prettier-plugin-solidity": "^2.0.0",
+    "solhint": "^5.1.0"
   }
 }
