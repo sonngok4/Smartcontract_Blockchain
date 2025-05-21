@@ -6,7 +6,7 @@ import EscrowCard from './EscrowCard';
 import './LandEscrows.css';
 
 function LandEscrows({ web3, contract, escrowContract, accounts }) {
-    const { landId } = useParams();
+    const { id } = useParams();
     const [escrows, setEscrows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -14,46 +14,51 @@ function LandEscrows({ web3, contract, escrowContract, accounts }) {
     const [filter, setFilter] = useState('all'); // all, active, completed, disputed
 
     const fetchEscrows = async () => {
-        if (!landId || !contract || !escrowContract || !accounts || accounts.length === 0) {
+        if (!id || !contract || !escrowContract || !accounts || accounts.length === 0) {
             setLoading(false);
             return;
         }
 
         try {
             toast.loading('Đang tải danh sách đặt cọc...');
+            console.log('Fetching escrows for land ID:', id);
 
             // Lấy thông tin bất động sản
-            const land = await contract.methods.getLandDetails(landId).call();
+            const land = await contract.methods.getLandDetails(id).call();
             console.log('Land details:', land);
             setLandDetails(land);
 
-            // Lấy tất cả escrow của bất động sản này
-            const allEscrowIds = await escrowContract.methods.getLandEscrows(landId).call();
-            console.log("All escrow IDs for land:", allEscrowIds);
+            // Lấy tất cả escrow của người dùng
+            const userEscrows = await escrowContract.methods.getUserEscrows(accounts[0]).call();
+            console.log("User escrows:", userEscrows);
 
-            // Lấy chi tiết từng escrow
+            // Lọc và lấy chi tiết các escrow liên quan đến bất động sản này
             const details = await Promise.all(
-                allEscrowIds.map(async (id) => {
+                userEscrows.map(async (escrowId) => {
                     try {
-                        const escrowDetails = await escrowContract.methods.getEscrowDetails(id).call();
-                        const metadata = await fetchMetadata(landId);
+                        const escrowDetails = await escrowContract.methods.getEscrowDetails(escrowId).call();
 
-                        return {
-                            id: id.toString(),
-                            ...escrowDetails,
-                            landId: escrowDetails.landId.toString(),
-                            state: escrowDetails.state.toString(),
-                            amount: escrowDetails.amount.toString(),
-                            metadata
-                        };
+                        // Chỉ lấy các escrow của bất động sản này
+                        if (escrowDetails.landId.toString() === id.toString()) {
+                            const metadata = await fetchMetadata(id);
+                            return {
+                                id: escrowId.toString(),
+                                ...escrowDetails,
+                                landId: escrowDetails.landId.toString(),
+                                state: escrowDetails.state.toString(),
+                                amount: escrowDetails.amount.toString(),
+                                metadata
+                            };
+                        }
+                        return null;
                     } catch (err) {
-                        console.error(`Error fetching escrow details for ID ${id}:`, err);
+                        console.error(`Error fetching escrow details for ID ${escrowId}:`, err);
                         return null;
                     }
                 })
             );
 
-            // Filter out failed fetches and only show escrows where the current user is either buyer or seller
+            // Filter out null values and escrows not related to this land
             const validEscrows = details.filter(escrow =>
                 escrow !== null && (
                     escrow.buyer.toLowerCase() === accounts[0].toLowerCase() ||
@@ -92,7 +97,7 @@ function LandEscrows({ web3, contract, escrowContract, accounts }) {
 
     useEffect(() => {
         fetchEscrows();
-    }, [landId, accounts, contract, escrowContract]);
+    }, [id, accounts, contract, escrowContract]);
 
     const handleConfirmEscrow = async (escrowId) => {
         try {
@@ -154,7 +159,7 @@ function LandEscrows({ web3, contract, escrowContract, accounts }) {
 
     return (
         <div className="land-escrows">
-            <h2>Quản lý đặt cọc cho bất động sản #{landId}</h2>
+            <h2>Quản lý đặt cọc cho bất động sản #{id}</h2>
 
             {landDetails && (
                 <div className="land-info">
