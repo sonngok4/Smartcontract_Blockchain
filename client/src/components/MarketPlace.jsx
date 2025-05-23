@@ -68,7 +68,7 @@ function MarketPlace({ web3, contract, accounts }) {
               }
             }
           } catch (err) {
-            console.log(`Token ${currentId} không tồn tại hoặc có lỗi:`, err.message);
+            // console.log(`Token ${currentId} không tồn tại hoặc có lỗi:`, err.message);
             continue;
           }
         }

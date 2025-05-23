@@ -47,7 +47,7 @@ function Dashboard({ web3, contract, accounts }) {
                 forSale: landDetails.forSale,
               });
             } catch (err) {
-              console.log(`Token ID ${i} might not exist`);
+              // console.log(`Token ID ${i} might not exist`);
               console.log(err);
             }
           }

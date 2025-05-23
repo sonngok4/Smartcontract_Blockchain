@@ -20,7 +20,7 @@ function EscrowManagement({ web3, contract, escrowContract, accounts }) {
         try {
             // Lấy danh sách escrow của người dùng
             const userEscrowIds = await escrowContract.methods.getUserEscrows(accounts[0]).call();
-            console.log("User escrow IDs:", userEscrowIds);
+            // console.log("User escrow IDs:", userEscrowIds);
 
             // Lấy thông tin chi tiết cho từng escrow
             const escrowDetails = await Promise.all(
@@ -40,7 +40,7 @@ function EscrowManagement({ web3, contract, escrowContract, accounts }) {
                     };
                 })
             );
-            console.log("Fetched escrow details:", escrowDetails);
+            // console.log("Fetched escrow details:", escrowDetails);
             setEscrows(escrowDetails);
             setLoading(false);
         } catch (err) {
