@@ -21,7 +21,7 @@ function LandEscrows({ web3, contract, escrowContract, accounts }) {
 
         try {
             toast.loading('Đang tải danh sách đặt cọc...');
-            // console.log('Fetching escrows for land ID:', id);
+            console.log('Fetching escrows for land ID:', id);
 
             // Lấy thông tin bất động sản
             const land = await contract.methods.getLandDetails(id).call();
