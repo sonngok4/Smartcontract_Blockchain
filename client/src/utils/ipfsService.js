@@ -5,9 +5,6 @@ import FormData from 'form-data';
 const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY;
 const PINATA_SECRET_KEY = import.meta.env.VITE_PINATA_SECRET_KEY;
 
-// console.log('PINATA_API_KEY', PINATA_API_KEY);
-// console.log('PINATA_SECRET_KEY', PINATA_SECRET_KEY);
-
 
 // Upload file lên IPFS
 const uploadFileToIPFS = async (file) => {

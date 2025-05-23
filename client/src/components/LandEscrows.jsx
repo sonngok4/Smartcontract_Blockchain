@@ -21,16 +21,16 @@ function LandEscrows({ web3, contract, escrowContract, accounts }) {
 
         try {
             toast.loading('Đang tải danh sách đặt cọc...');
-            console.log('Fetching escrows for land ID:', id);
+            // console.log('Fetching escrows for land ID:', id);
 
             // Lấy thông tin bất động sản
             const land = await contract.methods.getLandDetails(id).call();
-            console.log('Land details:', land);
+            // console.log('Land details:', land);
             setLandDetails(land);
 
             // Lấy tất cả escrow của người dùng
             const userEscrows = await escrowContract.methods.getUserEscrows(accounts[0]).call();
-            console.log("User escrows:", userEscrows);
+            // console.log("User escrows:", userEscrows);
 
             // Lọc và lấy chi tiết các escrow liên quan đến bất động sản này
             const details = await Promise.all(
@@ -67,7 +67,7 @@ function LandEscrows({ web3, contract, escrowContract, accounts }) {
                 )
             );
 
-            console.log("Valid escrows for land:", validEscrows);
+            // console.log("Valid escrows for land:", validEscrows);
             setEscrows(validEscrows);
             setLoading(false);
             toast.dismiss();
