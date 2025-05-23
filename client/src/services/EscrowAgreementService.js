@@ -660,7 +660,7 @@ class EscrowAgreementService {
 			const qrCanvas = document.createElement('canvas');
 			await QRCode.toCanvas(
 				qrCanvas,
-				`http://localhost:5173/escrow/${escrowData.escrowId}`,
+				`https://mylandnft.netlify.app/escrow/${escrowData.escrowId}`,
 				{ width: 150 },
 			);
 			const qrCode = qrCanvas.toDataURL('image/png');
@@ -707,7 +707,7 @@ class EscrowAgreementService {
 		yPos += 8;
 		this.drawText(
 			doc,
-			`Xác thực tại: http://localhost:5173/verify/${escrowData.escrowId}`,
+			`Xác thực tại: https://mylandnft.netlify.app/verify/${escrowData.escrowId}`,
 			14,
 			yPos,
 		);
@@ -869,7 +869,7 @@ class EscrowAgreementService {
           <div class="verification">
             <p>Hợp đồng này được tạo và xác thực bởi dApp Quản lý Quyền sở hữu BĐS</p>
             <p>Mã xác thực: ${formatData.verificationCode}</p>
-            <p>Xác thực tại: <a href="http://localhost:5173/verify/${escrowData.escrowId}" target="_blank">http://localhost:5173/verify/${escrowData.escrowId}</a></p>
+            <p>Xác thực tại: <a href="https://mylandnft.netlify.app/verify/${escrowData.escrowId}" target="_blank">https://mylandnft.netlify.app/verify/${escrowData.escrowId}</a></p>
           </div>
         </div>
         </body>
