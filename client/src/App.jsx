@@ -102,6 +102,45 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const initWeb3 = async () => {
+      try {
+        // Kiểm tra kết nối mạng
+        const chainId = await web3.eth.getChainId();
+        console.log('Connected to network:', chainId);
+
+        if (chainId !== 11155111n) { // Sepolia
+          setError('Vui lòng kết nối đến mạng Sepolia Testnet');
+          return;
+        }
+
+        // Kiểm tra địa chỉ hợp đồng
+        const contractAddress = escrowContract._address;
+        console.log('Contract address:', contractAddress);
+
+        // Kiểm tra tài khoản
+        const accounts = await web3.eth.getAccounts();
+        if (accounts.length === 0) {
+          setError('Vui lòng kết nối ví MetaMask');
+          return;
+        }
+        console.log('Connected account:', accounts[0]);
+
+        // Kiểm tra danh sách escrow của người dùng
+        const userEscrows = await escrowContract.methods.getUserEscrows(accounts[0]).call();
+        console.log('User Escrows:', userEscrows);
+
+      } catch (error) {
+        console.error('Error initializing Web3:', error);
+        setError('Lỗi kết nối Web3');
+      }
+    };
+
+    if (web3 && escrowContract) {
+      initWeb3();
+    }
+  }, [web3, escrowContract]);
+
   if (loading) {
     return (
       <div className="loading">
@@ -157,7 +196,7 @@ function App() {
             <Route path="/create-deposit/:id" element={<CreateDepositAgreement web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
             <Route path="/escrow/:id" element={<EscrowDetails web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
             <Route path="/land/:id/escrows" element={<LandEscrows web3={web3} contract={contract} escrowContract={escrowContract} accounts={accounts} />} />
-            <Route path="/verify/:id" element={<VerifyEscrow web3={web3} escrowContract={escrowContract} />} />
+            <Route path="/verify/:id" element={<VerifyEscrow web3={web3} escrowContract={escrowContract} accounts={accounts} />} />
           </Routes>
         </main>
 
